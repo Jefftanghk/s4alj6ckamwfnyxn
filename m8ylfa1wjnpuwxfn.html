@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cards">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Cards</title>
+<style>
+/* Layout: PIN screen, then a full-height horizontal swipe deck with one QR per screen */
+:root{--bg:#eef3f1;--fg:#16241f;--muted:#5d6f69;--panel:#ffffff;--accent:#1f8a70;--used:#c2412d;--line:#d3ddd9;
+--font:-apple-system,BlinkMacSystemFont,"PingFang HK","Noto Sans TC",system-ui,sans-serif;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1715;--fg:#e4eeea;--muted:#91a39d;--accent:#4cc3a2;--used:#f0715c;--line:#2a3a35;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);display:flex;flex-direction:column;overflow:hidden;
+padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);-webkit-user-select:none;user-select:none}
+.pad{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+/* lock */
+#lock{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+#lock h1{margin:0;font-size:1.1rem;font-weight:600;color:var(--muted)}
+.pins{display:flex;gap:14px}
+.pins span{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted)}
+.pins span.f{background:var(--fg);border-color:var(--fg)}
+.pins.bad{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+#msg{min-height:1.3em;color:var(--used);font-size:.9rem}
+.keys{display:grid;grid-template-columns:repeat(3,72px);gap:14px}
+.keys button{height:72px;border-radius:50%;border:0;background:var(--line);color:var(--fg);font:500 1.6rem var(--font);cursor:pointer}
+.keys button:active{background:var(--muted)}
+.keys .ghost{background:transparent;font-size:1rem}
+/* deck */
+header{padding-block:12px 4px;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+header h1{font-size:1.05rem;margin:0;font-weight:700}
+.count{color:var(--muted);font-size:.85rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+.deck{flex:1;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain}
+.deck::-webkit-scrollbar{display:none}
+.slide{flex:0 0 100%;scroll-snap-align:center;overflow-y:auto;padding-block:8px 16px;display:flex;flex-direction:column;gap:14px;align-items:center}
+.meta{width:100%;max-width:420px;display:flex;justify-content:space-between;align-items:center}
+.num{font-weight:700;font-size:1.6rem;font-variant-numeric:tabular-nums}
+.num small{font-size:.9rem;color:var(--muted);font-weight:500}
+.used{font:inherit;font-size:.9rem;border:1.5px solid var(--line);background:transparent;color:var(--fg);border-radius:999px;padding:6px 14px;cursor:pointer}
+.used[aria-pressed="true"]{border-color:var(--used);color:var(--used)}
+button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.qr{position:relative;width:100%;max-width:420px;background:var(--panel);border-radius:18px;padding:18px}
+.qr img{display:block;width:100%;height:auto}
+.stamp{position:absolute;inset:0;display:none;place-items:center;font-size:2.4rem;font-weight:700;color:#c2412d;background:rgba(255,255,255,.75);border-radius:18px;letter-spacing:.2em}
+.slide.is-used .stamp{display:grid}
+details{width:100%;max-width:420px;color:var(--muted);font-size:.9rem}
+summary{cursor:pointer;padding:4px 0}
+.full{margin-top:8px;border-radius:8px;width:100%;display:block}
+nav{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;padding-block:8px 12px}
+.dot{width:10px;height:10px;border-radius:50%;border:0;padding:0;background:var(--line);cursor:pointer}
+.dot.u{background:var(--used);opacity:.5}
+.dot.on{background:var(--accent);opacity:1;transform:scale(1.3)}
+.foot{text-align:center;padding-bottom:8px}
+.foot button{border:0;background:none;color:var(--muted);font:inherit;font-size:.8rem;text-decoration:underline;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.pins.bad{animation:none}}
+</style>
+</head>
+<body>
+<section id="lock" class="pad">
+  <h1 id="lockTitle">輸入 PIN</h1>
+  <div class="pins" id="pins"><span></span><span></span><span></span><span></span></div>
+  <div id="msg" role="status"></div>
+  <div class="keys" id="keys"></div>
+</section>
+<div id="app" hidden></div>
+<script>
+const SALT='2Nq3H8usqKLLtNzRLzWfHw==',ITER=1000000,DATA='xufyntnrffxby2fx.bin',KK='c-k',UK='c-u';
+const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+let blobP=fetch(DATA,{cache:'force-cache'}).then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()});
+async function derive(pin){const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pin),'PBKDF2',false,['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt:b64(SALT),iterations:ITER,hash:'SHA-256'},k,384))}
+async function decrypt(bits){const ct=await blobP;const key=await crypto.subtle.importKey('raw',bits.slice(0,32),'AES-CBC',false,['decrypt']);
+  const pt=await crypto.subtle.decrypt({name:'AES-CBC',iv:bits.slice(32,48)},key,ct);return JSON.parse(new TextDecoder().decode(pt))}
+const toHex=a=>[...a].map(x=>x.toString(16).padStart(2,'0')).join(''),fromHex=h=>new Uint8Array(h.match(/../g).map(x=>parseInt(x,16)));
+// keypad
+let pin='';const pins=[...document.querySelectorAll('#pins span')],msg=document.getElementById('msg'),keys=document.getElementById('keys');
+['1','2','3','4','5','6','7','8','9','','0','⌫'].forEach(k=>{const b=document.createElement('button');b.type='button';b.textContent=k;
+  if(k===''){b.className='ghost';b.disabled=true;b.style.visibility='hidden'}else if(k==='⌫'){b.className='ghost';b.setAttribute('aria-label','Delete')}
+  b.onclick=()=>press(k);keys.appendChild(b)});
+function draw(){pins.forEach((s,i)=>s.classList.toggle('f',i<pin.length))}
+let busy=false;
+async function press(k){if(busy)return;if(k==='⌫'){pin=pin.slice(0,-1);draw();return}if(pin.length>=4)return;pin+=k;draw();msg.textContent='';
+  if(pin.length===4){busy=true;msg.style.color='var(--muted)';msg.textContent='解鎖中…';
+    try{const bits=await derive(pin);const data=await decrypt(bits);store.set(KK,toHex(bits));show(data)}
+    catch(e){msg.style.color='';msg.textContent=(e===0||e instanceof TypeError)?'無法載入，請檢查網絡':'PIN 錯誤';const p=document.getElementById('pins');p.classList.remove('bad');void p.offsetWidth;p.classList.add('bad');pin='';draw()}
+    busy=false}}
+document.addEventListener('keydown',e=>{if(document.getElementById('lock').hidden)return;if(/^\d$/.test(e.key))press(e.key);else if(e.key==='Backspace')press('⌫')});
+// app
+function show(data){document.getElementById('lock').hidden=true;const app=document.getElementById("app");app.hidden=false;app.style.display="contents";
+  let used={};try{used=JSON.parse(store.get(UK)||'{}')}catch(e){}
+  const n=data.items.length;
+  app.innerHTML=`<header class="pad"><h1></h1><span class="count" id="count"></span></header><main class="deck" id="deck"></main><nav class="pad" id="dots"></nav><div class="foot"><button type="button" id="lockBtn">鎖定此裝置</button></div>`;
+  app.querySelector('h1').textContent=data.title;document.title=data.title;
+  const deck=app.querySelector('#deck'),nav=app.querySelector('#dots');
+  data.items.forEach((it,k)=>{const i=k+1;const s=document.createElement('section');s.className='slide pad';s.dataset.i=i;
+    s.innerHTML=`<div class="meta"><span class="num">券 ${String(i).padStart(2,'0')}<small> / ${n}</small></span><button class="used" type="button"></button></div>
+    <div class="qr"><img alt="Voucher ${i} QR code" src="data:image/png;base64,${it.qr}"><div class="stamp">已使用</div></div>
+    <details><summary>查看完整票券</summary><img class="full" alt="Full voucher ${i}" loading="lazy" src="data:image/jpeg;base64,${it.full}"></details>`;
+    deck.appendChild(s);const d=document.createElement('button');d.type='button';d.className='dot';d.setAttribute('aria-label','Voucher '+i);d.onclick=()=>go(i,true);nav.appendChild(d);
+    s.querySelector('.used').onclick=()=>{if(used[i])delete used[i];else used[i]=1;store.set(UK,JSON.stringify(used));render()}});
+  const slides=[...deck.children],dots=[...nav.children];
+  function render(){let left=0;slides.forEach((s,k)=>{const u=!!used[k+1];s.classList.toggle('is-used',u);const b=s.querySelector('.used');b.setAttribute('aria-pressed',u);b.textContent=u?'已使用 · 撤銷':'標記已用';dots[k].classList.toggle('u',u);if(!u)left++});
+    app.querySelector('#count').textContent=`剩餘 ${left} / ${n}`}
+  function go(i,sm){deck.scrollTo({left:(i-1)*deck.clientWidth,behavior:sm?'smooth':'auto'})}
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){const k=+e.target.dataset.i-1;dots.forEach((d,j)=>d.classList.toggle('on',j===k))}}),{root:deck,threshold:.6});
+  slides.forEach(s=>io.observe(s));render();
+  const first=slides.find(s=>!used[s.dataset.i]);if(first)requestAnimationFrame(()=>go(+first.dataset.i,false));
+  app.querySelector('#lockBtn').onclick=()=>{store.del(KK);location.reload()};
+  const wake=async()=>{try{await navigator.wakeLock?.request('screen')}catch(e){}};wake();
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')wake()})}
+// auto-unlock on this device if PIN entered before
+(async()=>{const h=store.get(KK);if(!h)return;try{show(await decrypt(fromHex(h)))}catch(e){store.del(KK)}})();
+</script>
+</body>
+</html>
