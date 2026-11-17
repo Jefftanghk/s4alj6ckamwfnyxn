@@ -15,7 +15,7 @@
 :root{--bg:#eef3f1;--fg:#16241f;--muted:#5d6f69;--panel:#ffffff;--accent:#1f8a70;--used:#c2412d;--line:#d3ddd9;
 --font:-apple-system,BlinkMacSystemFont,"PingFang HK","Noto Sans TC",system-ui,sans-serif;color-scheme:light}
 @media (prefers-color-scheme:dark){:root{--bg:#0f1715;--fg:#e4eeea;--muted:#91a39d;--accent:#4cc3a2;--used:#f0715c;--line:#2a3a35;color-scheme:dark}}
-*{box-sizing:border-box}
+*{box-sizing:border-box}[hidden]{display:none!important}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--fg);font-family:var(--font);display:flex;flex-direction:column;overflow:hidden;
 padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);-webkit-user-select:none;user-select:none}
@@ -69,9 +69,9 @@ nav{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;padding-block:8px
   <div id="msg" role="status"></div>
   <div class="keys" id="keys"></div>
 </section>
-<div id="app" hidden></div>
+<div id="app" hidden style="display:contents"></div>
 <script>
-const SALT='2Nq3H8usqKLLtNzRLzWfHw==',ITER=1000000,DATA='xufyntnrffxby2fx.bin',KK='c-k',UK='c-u';
+const SALT='aszvmycyQADHTOqhoHtZpw==',ITER=1000000,DATA='xufyntnrffxby2fx.bin',KK='c-k',UK='c-u';
 const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 let blobP=fetch(DATA,{cache:'force-cache'}).then(r=>{if(!r.ok)throw 0;return r.arrayBuffer()});
@@ -94,7 +94,7 @@ async function press(k){if(busy)return;if(k==='⌫'){pin=pin.slice(0,-1);draw();
     busy=false}}
 document.addEventListener('keydown',e=>{if(document.getElementById('lock').hidden)return;if(/^\d$/.test(e.key))press(e.key);else if(e.key==='Backspace')press('⌫')});
 // app
-function show(data){document.getElementById('lock').hidden=true;const app=document.getElementById("app");app.hidden=false;app.style.display="contents";
+function show(data){document.getElementById('lock').hidden=true;const app=document.getElementById("app");app.hidden=false;
   let used={};try{used=JSON.parse(store.get(UK)||'{}')}catch(e){}
   const n=data.items.length;
   app.innerHTML=`<header class="pad"><h1></h1><span class="count" id="count"></span></header><main class="deck" id="deck"></main><nav class="pad" id="dots"></nav><div class="foot"><button type="button" id="lockBtn">鎖定此裝置</button></div>`;
